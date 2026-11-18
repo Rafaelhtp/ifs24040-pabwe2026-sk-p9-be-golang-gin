@@ -1,0 +1,894 @@
+basePath: /
+definitions:
+  AdminUserResponse:
+    properties:
+      created_at:
+        format: date-time
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      role:
+        type: string
+      total_posts:
+        type: integer
+      total_published:
+        type: integer
+      username:
+        type: string
+    type: object
+  AuthResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: "#/definitions/UserResponse"
+    type: object
+  AuthorResponse:
+    properties:
+      id:
+        type: integer
+      username:
+        type: string
+    type: object
+  GenerateRequest:
+    properties:
+      category:
+        type: string
+      include_web_search:
+        type: boolean
+      topic:
+        type: string
+    required:
+    - topic
+    type: object
+  GenerateResponse:
+    properties:
+      category:
+        type: string
+      content:
+        description: Markdown
+        type: string
+      excerpt:
+        type: string
+      search_sources:
+        items:
+          $ref: "#/definitions/SearchSource"
+        type: array
+      title:
+        type: string
+    type: object
+  LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - username
+    - password
+    type: object
+  PostRequest:
+    properties:
+      category:
+        enum:
+        - Teknologi
+        - Pendidikan
+        - Gaya Hidup
+        - Bisnis
+        - Opini
+        - Umum
+        type: string
+      content:
+        type: string
+      cover_image_path:
+        type: string
+      excerpt:
+        type: string
+      is_published:
+        type: boolean
+      title:
+        type: string
+    required:
+    - title
+    - category
+    - content
+    type: object
+  PostResponse:
+    properties:
+      author:
+        $ref: "#/definitions/AuthorResponse"
+      category:
+        type: string
+      content:
+        type: string
+      cover_image_path:
+        type: string
+      created_at:
+        format: date-time
+        type: string
+      excerpt:
+        type: string
+      id:
+        type: integer
+      is_published:
+        type: boolean
+      published_at:
+        format: date-time
+        type: string
+      reading_time:
+        type: integer
+      slug:
+        type: string
+      title:
+        type: string
+      updated_at:
+        format: date-time
+        type: string
+      user_id:
+        type: integer
+    type: object
+  RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - username
+    - email
+    - password
+    type: object
+  Response:
+    properties:
+      data:
+        type: object
+      message:
+        type: string
+      status:
+        enum:
+        - success
+        - fail
+        - error
+        type: string
+    type: object
+  SearchSource:
+    properties:
+      snippet:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+  StatsResponse:
+    properties:
+      total_draft:
+        type: integer
+      total_posts:
+        type: integer
+      total_published:
+        type: integer
+    type: object
+  UpdateProfileRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - username
+    - email
+    type: object
+  UserResponse:
+    properties:
+      created_at:
+        format: date-time
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      role:
+        enum:
+        - member
+        - admin
+        type: string
+      updated_at:
+        format: date-time
+        type: string
+      username:
+        type: string
+    type: object
+info:
+  description: REST API Delcom Blog (Golang Gin)
+  title: Delcom Blog API
+  version: "1.0"
+paths:
+  /api/admin/posts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  $ref: "#/definitions/PostResponse"
+                type: array
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "403":
+          description: Akses ditolak
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Monitoring seluruh artikel
+      tags:
+      - Admin
+  /api/admin/users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  $ref: "#/definitions/AdminUserResponse"
+                type: array
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "403":
+          description: Akses ditolak
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Monitoring seluruh user
+      tags:
+      - Admin
+  /api/admin/users/{id}/posts:
+    get:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  $ref: "#/definitions/PostResponse"
+                type: array
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "403":
+          description: Akses ditolak
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Artikel milik user tertentu
+      tags:
+      - Admin
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/LoginRequest"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/AuthResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+      summary: Login dan dapatkan JWT
+      tags:
+      - Auth
+  /api/auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Logout
+      tags:
+      - Auth
+  /api/auth/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/UserResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Ambil profil
+      tags:
+      - Auth
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/UpdateProfileRequest"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/UserResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+        "409":
+          description: Konflik data
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Perbarui profil
+      tags:
+      - Auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/RegisterRequest"
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/UserResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "409":
+          description: Konflik data
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      summary: Registrasi penulis
+      tags:
+      - Auth
+  /api/posts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  $ref: "#/definitions/PostResponse"
+                type: array
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Daftar artikel milik sendiri
+      tags:
+      - Posts
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/PostRequest"
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/PostResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Buat artikel
+      tags:
+      - Posts
+  /api/posts/ai-generate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/GenerateRequest"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/GenerateResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "502":
+          description: AI / search engine gagal
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Generate artikel dengan AI
+      tags:
+      - AI
+  /api/posts/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/StatsResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Statistik artikel penulis
+      tags:
+      - Posts
+  /api/posts/{id}:
+    delete:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: "#/definitions/Response"
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Hapus artikel
+      tags:
+      - Posts
+    get:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/PostResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Detail artikel milik sendiri
+      tags:
+      - Posts
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: integer
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/PostRequest"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/PostResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Perbarui artikel
+      tags:
+      - Posts
+  /api/posts/{id}/toggle-publish:
+    patch:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/PostResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Data tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "401":
+          description: Token tidak valid
+          schema:
+            $ref: "#/definitions/Response"
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      security:
+      - BearerAuth: []
+      summary: Toggle Draf/Terbit
+      tags:
+      - Posts
+  /api/public/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  type: string
+                type: array
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+      summary: Daftar kategori
+      tags:
+      - Public
+  /api/public/posts:
+    get:
+      parameters:
+      - description: Kata kunci pencarian
+        in: query
+        name: q
+        required: false
+        type: string
+      - description: Filter kategori
+        in: query
+        name: category
+        required: false
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  $ref: "#/definitions/PostResponse"
+                type: array
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "500":
+          description: Kesalahan server
+          schema:
+            $ref: "#/definitions/Response"
+      summary: Daftar artikel terbit
+      tags:
+      - Public
+  /api/public/posts/{slug}:
+    get:
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: "#/definitions/PostResponse"
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "404":
+          description: Tidak ditemukan
+          schema:
+            $ref: "#/definitions/Response"
+      summary: Detail artikel publik berdasarkan slug
+      tags:
+      - Public
+securityDefinitions:
+  BearerAuth:
+    description: "Format: Bearer <token>"
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

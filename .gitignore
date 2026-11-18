@@ -1,0 +1,24 @@
+# Binaries (wajib diawali "/" agar folder internal/server/ tidak ikut ter-ignore)
+/server
+/main
+/app
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Environment variables
+.env
+
+# Test & coverage artifacts
+*.test
+*.out
+coverage.out
+coverage.html
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
