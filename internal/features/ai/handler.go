@@ -34,7 +34,7 @@ func (h *Handler) Generate(c *gin.Context) {
 			response.Fail(c, http.StatusBadRequest, err.Error())
 			return
 		}
-		response.Error(c, http.StatusBadGateway, err.Error())
+		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 

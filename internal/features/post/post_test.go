@@ -280,7 +280,11 @@ func TestPostLifecycle(t *testing.T) {
 
 	// admin
 	expect(t, e.do(http.MethodGet, "/api/admin/users", nil, "u1"), 403, "member forbidden")
-	expect(t, e.do(http.MethodGet, "/api/admin/users", nil, "adm"), 200, "admin users")
+	w = e.do(http.MethodGet, "/api/admin/users", nil, "adm")
+	expect(t, w, 200, "admin users")
+	if !strings.Contains(w.Body.String(), `"total_articles"`) || !strings.Contains(w.Body.String(), `"total_published"`) {
+		t.Fatalf("admin users must include total_articles and total_published: %s", w.Body.String())
+	}
 	expect(t, e.do(http.MethodGet, "/api/admin/posts", nil, "adm"), 200, "admin posts")
 	uid := strconv.Itoa(int(e.users["u1"]))
 	expect(t, e.do(http.MethodGet, "/api/admin/users/"+uid+"/posts", nil, "adm"), 200, "admin user posts")

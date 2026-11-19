@@ -80,6 +80,7 @@ type AdminUserResponse struct {
 	Username       string    `json:"username"`
 	Email          string    `json:"email"`
 	Role           string    `json:"role"`
+	TotalArticles  int64     `json:"total_articles"`
 	TotalPosts     int64     `json:"total_posts"`
 	TotalPublished int64     `json:"total_published"`
 	CreatedAt      time.Time `json:"created_at"`

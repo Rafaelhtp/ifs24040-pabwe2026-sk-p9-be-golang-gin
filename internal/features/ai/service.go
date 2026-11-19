@@ -10,8 +10,8 @@ import (
 
 var (
 	ErrInvalidCategory = errors.New("kategori tidak valid")
-	ErrSearchFailed    = errors.New("gagal mengambil hasil pencarian web")
-	ErrAIFailed        = errors.New("gagal membuat artikel dengan AI")
+	ErrSearchFailed    = errors.New("gagal mengambil hasil pencarian web untuk OpenAI")
+	ErrAIFailed        = errors.New("gagal membuat artikel dengan OpenAI")
 )
 
 type Service struct {

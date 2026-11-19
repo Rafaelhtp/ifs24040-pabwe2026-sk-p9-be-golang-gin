@@ -91,11 +91,46 @@ func TestAuth_FullLifecycle(t *testing.T) {
 		} `json:"data"`
 	}
 	_ = json.Unmarshal(wReg.Body.Bytes(), &regResp)
-	if regResp.Data.Token == "" || regResp.Data.User["username"] != "penulis1" {
+	if regResp.Data.Token == "" || regResp.Data.User["username"] != "penulis1" || regResp.Data.User["role"] != "member" {
 		t.Fatalf("register must return token and user: %s", wReg.Body.String())
 	}
 	if _, hasPass := regResp.Data.User["password"]; hasPass {
 		t.Fatalf("user must not expose password")
+	}
+
+	// 2a. Register with role admin and unknown role fallback
+	wAdminReg := doJSONRequest(r, http.MethodPost, "/api/auth/register", RegisterRequest{
+		Username: "admin_reg",
+		Email:    "admin_reg@delcom.org",
+		Password: "password123",
+		Role:     "admin",
+	}, "")
+	if wAdminReg.Code != http.StatusCreated {
+		t.Fatalf("expected 201 on admin register, got %d: %s", wAdminReg.Code, wAdminReg.Body.String())
+	}
+	var adminRegResp struct {
+		Data AuthResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wAdminReg.Body.Bytes(), &adminRegResp)
+	if adminRegResp.Data.User.Role != database.RoleAdmin {
+		t.Fatalf("expected role admin, got %q", adminRegResp.Data.User.Role)
+	}
+
+	wUnknownRoleReg := doJSONRequest(r, http.MethodPost, "/api/auth/register", RegisterRequest{
+		Username: "super_reg",
+		Email:    "super_reg@delcom.org",
+		Password: "password123",
+		Role:     "super",
+	}, "")
+	if wUnknownRoleReg.Code != http.StatusCreated {
+		t.Fatalf("expected 201 on unknown role register, got %d: %s", wUnknownRoleReg.Code, wUnknownRoleReg.Body.String())
+	}
+	var unknownRoleResp struct {
+		Data AuthResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wUnknownRoleReg.Body.Bytes(), &unknownRoleResp)
+	if unknownRoleResp.Data.User.Role != database.RoleMember {
+		t.Fatalf("expected role member fallback, got %q", unknownRoleResp.Data.User.Role)
 	}
 
 	// 2b. Register validation: username kosong, email kosong/invalid, password pendek

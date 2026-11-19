@@ -255,6 +255,7 @@ func (s *Service) AdminListUsers() ([]AdminUserResponse, error) {
 			Username:       u.Username,
 			Email:          u.Email,
 			Role:           u.Role,
+			TotalArticles:  total,
 			TotalPosts:     total,
 			TotalPublished: published,
 			CreatedAt:      u.CreatedAt,

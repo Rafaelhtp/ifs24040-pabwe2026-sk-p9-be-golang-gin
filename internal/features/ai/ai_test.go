@@ -130,24 +130,24 @@ func TestGenerate_Errors(t *testing.T) {
 
 	// search failures
 	m.searchStatus = 500
-	expectCode(t, call(r, GenerateRequest{Topic: "x", IncludeWebSearch: true}), 502, "search status")
+	expectCode(t, call(r, GenerateRequest{Topic: "x", IncludeWebSearch: true}), 500, "search status")
 	m.searchStatus = 200
 	m.searchBody = "not json"
-	expectCode(t, call(r, GenerateRequest{Topic: "x", IncludeWebSearch: true}), 502, "search invalid json")
+	expectCode(t, call(r, GenerateRequest{Topic: "x", IncludeWebSearch: true}), 500, "search invalid json")
 	m.searchBody = `{"results":[]}`
 
 	// openai failures
 	m.chatStatus = 500
-	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 502, "openai status")
+	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 500, "openai status")
 	m.chatStatus = 200
 	m.chatBody = "not json"
-	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 502, "openai invalid envelope")
+	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 500, "openai invalid envelope")
 	m.chatBody = `{"choices":[]}`
-	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 502, "openai no choices")
+	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 500, "openai no choices")
 	m.chatBody = articleChat("bukan json")
-	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 502, "openai invalid article json")
+	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 500, "openai invalid article json")
 	m.chatBody = articleChat(`{"title":"","content":""}`)
-	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 502, "openai incomplete article")
+	expectCode(t, call(r, GenerateRequest{Topic: "x"}), 500, "openai incomplete article")
 }
 
 func TestClients_TransportErrors(t *testing.T) {

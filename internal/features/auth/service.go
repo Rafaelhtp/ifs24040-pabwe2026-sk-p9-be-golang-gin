@@ -68,11 +68,16 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 		return nil, err
 	}
 
+	role := strings.ToLower(strings.TrimSpace(req.Role))
+	if role != database.RoleAdmin {
+		role = database.RoleMember
+	}
+
 	user := database.User{
 		Username: username,
 		Email:    email,
 		Password: string(hashed),
-		Role:     database.RoleMember,
+		Role:     role,
 	}
 
 	if err := s.repo.Create(&user); err != nil {
