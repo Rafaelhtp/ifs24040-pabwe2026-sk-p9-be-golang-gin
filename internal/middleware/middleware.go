@@ -78,7 +78,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 		userRole := c.GetString("role")
 		if userRole != "" {
 			for _, role := range roles {
-				if userRole == role {
+				if strings.EqualFold(strings.TrimSpace(userRole), strings.TrimSpace(role)) {
 					c.Next()
 					return
 				}
@@ -95,7 +95,7 @@ type clientLimiter struct {
 }
 
 func RateLimiter(options ...int) gin.HandlerFunc {
-	maxRequests := 100
+	maxRequests := 1000
 	window := time.Minute
 
 	if len(options) > 0 && options[0] > 0 {

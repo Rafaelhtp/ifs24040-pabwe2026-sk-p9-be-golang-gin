@@ -162,9 +162,9 @@ func TestRequireRole(t *testing.T) {
 		t.Fatalf("expected 403, got %d", w2.Code)
 	}
 
-	// 3. Role is admin (allowed)
+	// 3. Role is admin (allowed), case-insensitive
 	w3 := httptest.NewRecorder()
-	r.ServeHTTP(w3, httptest.NewRequest(http.MethodGet, "/admin-only?role=admin", nil))
+	r.ServeHTTP(w3, httptest.NewRequest(http.MethodGet, "/admin-only?role=Admin", nil))
 	if w3.Code != http.StatusOK || w3.Body.String() != "welcome admin" {
 		t.Fatalf("expected 200 welcome admin, got %d %s", w3.Code, w3.Body.String())
 	}

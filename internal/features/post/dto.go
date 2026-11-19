@@ -64,6 +64,7 @@ type PublicPostResponse struct {
 	PublishedAt    *time.Time     `json:"published_at"`
 	ReadingTime    int            `json:"reading_time"`
 	Author         AuthorResponse `json:"author"`
+	AuthorName     string         `json:"author_name"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 }
@@ -124,6 +125,7 @@ func ToPublicPostResponse(p database.Post) PublicPostResponse {
 		PublishedAt:    p.PublishedAt,
 		ReadingTime:    CalculateReadingTime(p.Content),
 		Author:         AuthorResponse{ID: p.User.ID, Username: p.User.Username},
+		AuthorName:     p.User.Username, // model User belum punya field Name; gunakan Username
 		CreatedAt:      p.CreatedAt,
 		UpdatedAt:      p.UpdatedAt,
 	}

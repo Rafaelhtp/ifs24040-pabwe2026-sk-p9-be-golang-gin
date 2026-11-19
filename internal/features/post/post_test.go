@@ -267,7 +267,8 @@ func TestPostLifecycle(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "post-terbit") {
 		t.Fatalf("filter result missing post: %s", w.Body.String())
 	}
-	if strings.Contains(w.Body.String(), "user_id") || !strings.Contains(w.Body.String(), `"author"`) {
+	if strings.Contains(w.Body.String(), "user_id") || !strings.Contains(w.Body.String(), `"author"`) ||
+		!strings.Contains(w.Body.String(), `"author_name":"u1"`) {
 		t.Fatalf("public list must hide user_id and include author: %s", w.Body.String())
 	}
 	w = e.do(http.MethodGet, "/api/public/posts/post-terbit", nil, "")
