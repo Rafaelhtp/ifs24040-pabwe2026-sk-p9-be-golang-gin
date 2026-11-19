@@ -38,9 +38,9 @@ func (r *Repository) SlugExists(slug string, excludeID uint) (bool, error) {
 	return count > 0, nil
 }
 
-func (r *Repository) FindByIDAndUser(id, userID uint) (*database.Post, error) {
+func (r *Repository) FindByID(id uint) (*database.Post, error) {
 	var p database.Post
-	if err := r.db.Where("id = ? AND user_id = ?", id, userID).First(&p).Error; err != nil {
+	if err := r.db.First(&p, id).Error; err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -100,12 +100,4 @@ func (r *Repository) ListUsers() ([]database.User, error) {
 		return nil, err
 	}
 	return users, nil
-}
-
-func (r *Repository) UserExists(id uint) (bool, error) {
-	var count int64
-	if err := r.db.Model(&database.User{}).Where("id = ?", id).Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }

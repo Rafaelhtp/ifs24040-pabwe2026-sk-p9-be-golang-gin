@@ -38,7 +38,7 @@ func (h *Handler) Register(c *gin.Context) {
 	res, err := h.service.Register(req)
 	if err != nil {
 		if errors.Is(err, ErrUserAlreadyExists) {
-			response.Fail(c, http.StatusConflict, err.Error())
+			response.Fail(c, http.StatusBadRequest, err.Error())
 			return
 		}
 		response.Error(c, http.StatusInternalServerError, "Gagal melakukan registrasi: "+err.Error())

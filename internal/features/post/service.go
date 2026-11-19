@@ -12,8 +12,9 @@ import (
 
 var (
 	ErrPostNotFound     = errors.New("artikel tidak ditemukan")
-	ErrUserNotFound     = errors.New("user tidak ditemukan")
+	ErrForbidden        = errors.New("anda tidak memiliki akses ke artikel ini")
 	ErrInvalidCategory  = errors.New("kategori tidak valid")
+	ErrInvalidInput     = errors.New("title dan content tidak boleh kosong")
 	nonAlphanumericRegx = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
@@ -66,28 +67,47 @@ func (s *Service) uniqueSlug(title string, excludeID uint) (string, error) {
 	}
 }
 
+// findOwned mencari artikel berdasarkan id, lalu memastikan kepemilikannya.
+func (s *Service) findOwned(userID, id uint) (*database.Post, error) {
+	p, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, ErrPostNotFound
+	}
+	if p.UserID != userID {
+		return nil, ErrForbidden
+	}
+	return p, nil
+}
+
 func (s *Service) GetCategories() []string {
 	return Categories
 }
 
-func (s *Service) ListPublic(f PostFilter) ([]PostResponse, error) {
+func (s *Service) ListPublic(f PostFilter) ([]PublicPostResponse, error) {
 	posts, err := s.repo.ListPublished(f)
 	if err != nil {
 		return nil, err
 	}
-	return toResponses(posts, true), nil
+	result := make([]PublicPostResponse, 0, len(posts))
+	for _, p := range posts {
+		result = append(result, ToPublicPostResponse(p))
+	}
+	return result, nil
 }
 
-func (s *Service) GetPublicBySlug(slug string) (*PostResponse, error) {
+func (s *Service) GetPublicBySlug(slug string) (*PublicPostResponse, error) {
 	p, err := s.repo.FindPublishedBySlug(slug)
 	if err != nil {
 		return nil, ErrPostNotFound
 	}
-	res := ToPostResponse(*p, true)
+	res := ToPublicPostResponse(*p)
 	return &res, nil
 }
 
 func (s *Service) Create(userID uint, req PostRequest) (*PostResponse, error) {
+	if req.Category == "" {
+		req.Category = DefaultCategory
+	}
 	if !validCategory(req.Category) {
 		return nil, ErrInvalidCategory
 	}
@@ -103,12 +123,8 @@ func (s *Service) Create(userID uint, req PostRequest) (*PostResponse, error) {
 		Excerpt:        req.Excerpt,
 		Content:        req.Content,
 		CoverImagePath: req.CoverImagePath,
-		IsPublished:    req.IsPublished,
 	}
-	if req.IsPublished {
-		now := time.Now()
-		p.PublishedAt = &now
-	}
+	applyPublish(&p, req.IsPublished)
 	if err := s.repo.Create(&p); err != nil {
 		return nil, err
 	}
@@ -125,35 +141,53 @@ func (s *Service) ListMine(userID uint) ([]PostResponse, error) {
 }
 
 func (s *Service) GetMine(userID, id uint) (*PostResponse, error) {
-	p, err := s.repo.FindByIDAndUser(id, userID)
+	p, err := s.findOwned(userID, id)
 	if err != nil {
-		return nil, ErrPostNotFound
+		return nil, err
 	}
 	res := ToPostResponse(*p, false)
 	return &res, nil
 }
 
-func (s *Service) Update(userID, id uint, req PostRequest) (*PostResponse, error) {
-	p, err := s.repo.FindByIDAndUser(id, userID)
+func (s *Service) Update(userID, id uint, req UpdatePostRequest) (*PostResponse, error) {
+	p, err := s.findOwned(userID, id)
 	if err != nil {
-		return nil, ErrPostNotFound
+		return nil, err
 	}
-	if !validCategory(req.Category) {
-		return nil, ErrInvalidCategory
-	}
-	if req.Title != p.Title {
-		slug, err := s.uniqueSlug(req.Title, p.ID)
-		if err != nil {
-			return nil, err
+	if req.Title != nil {
+		if strings.TrimSpace(*req.Title) == "" {
+			return nil, ErrInvalidInput
 		}
-		p.Slug = slug
+		if *req.Title != p.Title {
+			slug, err := s.uniqueSlug(*req.Title, p.ID)
+			if err != nil {
+				return nil, err
+			}
+			p.Slug = slug
+		}
+		p.Title = *req.Title
 	}
-	p.Title = req.Title
-	p.Category = req.Category
-	p.Excerpt = req.Excerpt
-	p.Content = req.Content
-	p.CoverImagePath = req.CoverImagePath
-	applyPublish(p, req.IsPublished)
+	if req.Content != nil {
+		if strings.TrimSpace(*req.Content) == "" {
+			return nil, ErrInvalidInput
+		}
+		p.Content = *req.Content
+	}
+	if req.Category != nil {
+		if !validCategory(*req.Category) {
+			return nil, ErrInvalidCategory
+		}
+		p.Category = *req.Category
+	}
+	if req.Excerpt != nil {
+		p.Excerpt = *req.Excerpt
+	}
+	if req.CoverImagePath != nil {
+		p.CoverImagePath = *req.CoverImagePath
+	}
+	if req.IsPublished != nil {
+		applyPublish(p, *req.IsPublished)
+	}
 	if err := s.repo.Save(p); err != nil {
 		return nil, err
 	}
@@ -173,17 +207,17 @@ func applyPublish(p *database.Post, publish bool) {
 }
 
 func (s *Service) Delete(userID, id uint) error {
-	p, err := s.repo.FindByIDAndUser(id, userID)
+	p, err := s.findOwned(userID, id)
 	if err != nil {
-		return ErrPostNotFound
+		return err
 	}
 	return s.repo.Delete(p)
 }
 
 func (s *Service) TogglePublish(userID, id uint) (*PostResponse, error) {
-	p, err := s.repo.FindByIDAndUser(id, userID)
+	p, err := s.findOwned(userID, id)
 	if err != nil {
-		return nil, ErrPostNotFound
+		return nil, err
 	}
 	applyPublish(p, !p.IsPublished)
 	if err := s.repo.Save(p); err != nil {
@@ -199,9 +233,9 @@ func (s *Service) Stats(userID uint) (*StatsResponse, error) {
 		return nil, err
 	}
 	return &StatsResponse{
-		TotalPosts:     total,
-		TotalPublished: published,
-		TotalDraft:     total - published,
+		TotalArticles: total,
+		TotalSelesai:  published,
+		BelumSelesai:  total - published,
 	}, nil
 }
 
@@ -237,14 +271,8 @@ func (s *Service) AdminListPosts() ([]PostResponse, error) {
 	return toResponses(posts, true), nil
 }
 
+// AdminListUserPosts mengembalikan artikel user; user tidak ada / belum punya artikel -> daftar kosong.
 func (s *Service) AdminListUserPosts(userID uint) ([]PostResponse, error) {
-	exists, err := s.repo.UserExists(userID)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ErrUserNotFound
-	}
 	return s.ListMine(userID)
 }
 

@@ -9,6 +9,7 @@ import (
 	"app/internal/config"
 
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func TestConnectDatabase_SQLiteMemoryAndMigrateAndSeed(t *testing.T) {
@@ -144,5 +145,40 @@ func TestSeed_Errors(t *testing.T) {
 	}
 	if err := Seed(db, longPasswordCfg); err == nil {
 		t.Fatalf("expected bcrypt error when password exceeds 72 bytes")
+	}
+}
+
+func TestSeed_FixesExistingAccountRole(t *testing.T) {
+	cfg := &config.Config{DBConnection: "sqlite", DBDatabase: ":memory:"}
+	db, err := ConnectDatabase(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := AutoMigrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// "admin" sudah terdaftar sebagai member sebelum seeding
+	pre := User{Username: "admin", Email: "admin@delcom.org", Password: "x", Role: RoleMember}
+	if err := db.Create(&pre).Error; err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := Seed(db, cfg); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	var admin User
+	if err := db.Where("username = ?", "admin").First(&admin).Error; err != nil || admin.Role != RoleAdmin {
+		t.Fatalf("expected admin role after seed, got %q (%v)", admin.Role, err)
+	}
+
+	// error saat update role
+	if err := db.Model(&User{}).Where("username = ?", "member").Update("role", RoleAdmin).Error; err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	_ = db.Callback().Update().Before("gorm:update").Register("force_err", func(d *gorm.DB) {
+		_ = d.AddError(gorm.ErrInvalidDB)
+	})
+	if err := Seed(db, cfg); err == nil {
+		t.Fatal("expected error when role update fails")
 	}
 }

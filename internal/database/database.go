@@ -127,6 +127,13 @@ func Seed(db *gorm.DB, cfg *config.Config) error {
 		if err := db.Where("username = ?", item.Username).FirstOrCreate(&user).Error; err != nil {
 			return err
 		}
+
+		// Pastikan akun bawaan selalu memiliki role yang benar (mis. jika sudah terdaftar sebagai member).
+		if user.Role != item.Role {
+			if err := db.Model(&user).Update("role", item.Role).Error; err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

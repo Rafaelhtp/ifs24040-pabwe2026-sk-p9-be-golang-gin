@@ -166,11 +166,11 @@ definitions:
     type: object
   StatsResponse:
     properties:
-      total_draft:
+      belum_selesai:
         type: integer
-      total_posts:
+      total_articles:
         type: integer
-      total_published:
+      total_selesai:
         type: integer
     type: object
   UpdateProfileRequest:
@@ -476,18 +476,14 @@ paths:
           schema:
             properties:
               data:
-                $ref: "#/definitions/UserResponse"
+                $ref: "#/definitions/AuthResponse"
               message:
                 type: string
               status:
                 type: string
             type: object
         "400":
-          description: Data tidak valid
-          schema:
-            $ref: "#/definitions/Response"
-        "409":
-          description: Konflik data
+          description: Data tidak valid atau username/email sudah terdaftar
           schema:
             $ref: "#/definitions/Response"
         "500":

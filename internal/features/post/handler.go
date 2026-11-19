@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup, authMiddleware gin.Handle
 	posts.GET("/stats", h.Stats)
 	posts.GET("/:id", h.GetMine)
 	posts.PUT("/:id", h.Update)
+	posts.PATCH("/:id", h.Update)
 	posts.DELETE("/:id", h.Delete)
 	posts.PATCH("/:id/toggle-publish", h.TogglePublish)
 
@@ -51,9 +52,11 @@ func parseID(c *gin.Context) (uint, bool) {
 
 func (h *Handler) handleErr(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, ErrPostNotFound), errors.Is(err, ErrUserNotFound):
+	case errors.Is(err, ErrPostNotFound):
 		response.Fail(c, http.StatusNotFound, err.Error())
-	case errors.Is(err, ErrInvalidCategory):
+	case errors.Is(err, ErrForbidden):
+		response.Fail(c, http.StatusForbidden, err.Error())
+	case errors.Is(err, ErrInvalidCategory), errors.Is(err, ErrInvalidInput):
 		response.Fail(c, http.StatusBadRequest, err.Error())
 	default:
 		response.Error(c, http.StatusInternalServerError, err.Error())
@@ -123,7 +126,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req PostRequest
+	var req UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "Data artikel tidak valid: "+err.Error())
 		return

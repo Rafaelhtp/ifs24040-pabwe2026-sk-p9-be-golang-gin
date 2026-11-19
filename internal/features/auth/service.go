@@ -30,7 +30,28 @@ func NewService(repo *Repository, secretKey string) *Service {
 	}
 }
 
-func (s *Service) Register(req RegisterRequest) (*UserResponse, error) {
+func (s *Service) authResponse(user database.User) *AuthResponse {
+	claims := &middleware.Claims{
+		UserID:   user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		Role:     user.Role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, _ := token.SignedString([]byte(s.secretKey))
+
+	return &AuthResponse{
+		Token: tokenString,
+		User:  ToUserResponse(user),
+	}
+}
+
+func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 	username := strings.TrimSpace(req.Username)
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 
@@ -58,8 +79,7 @@ func (s *Service) Register(req RegisterRequest) (*UserResponse, error) {
 		return nil, err
 	}
 
-	res := ToUserResponse(user)
-	return &res, nil
+	return s.authResponse(user), nil
 }
 
 func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
@@ -73,24 +93,7 @@ func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
 		return nil, ErrInvalidCredentials
 	}
 
-	claims := &middleware.Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Email:    user.Email,
-		Role:     user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, _ := token.SignedString([]byte(s.secretKey))
-
-	return &AuthResponse{
-		Token: tokenString,
-		User:  ToUserResponse(*user),
-	}, nil
+	return s.authResponse(*user), nil
 }
 
 func (s *Service) GetProfile(userID uint) (*UserResponse, error) {
@@ -102,25 +105,27 @@ func (s *Service) GetProfile(userID uint) (*UserResponse, error) {
 	return &res, nil
 }
 
+// UpdateProfile memperbarui hanya field yang dikirim (partial update).
 func (s *Service) UpdateProfile(userID uint, req UpdateProfileRequest) (*UserResponse, error) {
 	user, err := s.repo.FindByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
 
-	username := strings.TrimSpace(req.Username)
-	email := strings.TrimSpace(strings.ToLower(req.Email))
+	if username := strings.TrimSpace(req.Username); username != "" {
+		user.Username = username
+	}
+	if email := strings.TrimSpace(strings.ToLower(req.Email)); email != "" {
+		user.Email = email
+	}
 
-	exists, err := s.repo.ExistsByUsernameOrEmail(username, email, userID)
+	exists, err := s.repo.ExistsByUsernameOrEmail(user.Username, user.Email, userID)
 	if err != nil {
 		return nil, err
 	}
 	if exists {
 		return nil, ErrUserAlreadyExists
 	}
-
-	user.Username = username
-	user.Email = email
 
 	if strings.TrimSpace(req.Password) != "" {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

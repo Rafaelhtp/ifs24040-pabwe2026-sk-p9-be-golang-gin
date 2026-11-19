@@ -204,27 +204,48 @@ func TestPostLifecycle(t *testing.T) {
 	expect(t, e.do(http.MethodGet, "/api/posts", nil, "u1"), 200, "list mine")
 	id := strconv.Itoa(int(draft.Data.ID))
 	expect(t, e.do(http.MethodGet, "/api/posts/"+id, nil, "u1"), 200, "get mine")
-	expect(t, e.do(http.MethodGet, "/api/posts/"+id, nil, "u2"), 404, "get other's")
+	expect(t, e.do(http.MethodGet, "/api/posts/"+id, nil, "u2"), 403, "get other's")
 	expect(t, e.do(http.MethodGet, "/api/posts/abc", nil, "u1"), 400, "get bad id")
+	expect(t, e.do(http.MethodGet, "/api/posts/9999", nil, "u1"), 404, "get not found")
 
-	// update
-	good := PostRequest{Title: "Belajar Go", Category: "Teknologi", Content: "baru", IsPublished: true}
-	expect(t, e.do(http.MethodPut, "/api/posts/abc", good, "u1"), 400, "update bad id")
+	// default category + draft => published_at null
+	w = e.do(http.MethodPost, "/api/posts", PostRequest{Title: "Tanpa Kategori", Content: "isi"}, "u1")
+	expect(t, w, 201, "create default category")
+	var def postEnvelope
+	_ = json.Unmarshal(w.Body.Bytes(), &def)
+	if def.Data.Category != "Umum" || def.Data.PublishedAt != nil || def.Data.IsPublished {
+		t.Fatalf("unexpected default post: %+v", def.Data)
+	}
+	expect(t, e.do(http.MethodDelete, "/api/posts/"+strconv.Itoa(int(def.Data.ID)), nil, "u1"), 200, "delete default post")
+
+	// update (partial)
+	s := func(v string) *string { return &v }
+	b := func(v bool) *bool { return &v }
+	expect(t, e.do(http.MethodPut, "/api/posts/abc", UpdatePostRequest{}, "u1"), 400, "update bad id")
 	expect(t, e.do(http.MethodPut, "/api/posts/"+id, "{bad", "u1"), 400, "update bad json")
-	expect(t, e.do(http.MethodPut, "/api/posts/9999", good, "u1"), 404, "update not found")
-	bad := good
-	bad.Category = "Lain"
-	expect(t, e.do(http.MethodPut, "/api/posts/"+id, bad, "u1"), 400, "update bad category")
-	expect(t, e.do(http.MethodPut, "/api/posts/"+id, good, "u1"), 200, "update publish same title")
-	good.Title = "Judul Baru"
-	expect(t, e.do(http.MethodPut, "/api/posts/"+id, good, "u1"), 200, "update keep published, new title")
+	expect(t, e.do(http.MethodPut, "/api/posts/9999", UpdatePostRequest{}, "u1"), 404, "update not found")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Title: s("x")}, "u2"), 403, "update other's")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Category: s("Lain")}, "u1"), 400, "update bad category")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Title: s("  ")}, "u1"), 400, "update empty title")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Content: s("")}, "u1"), 400, "update empty content")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{}, "u1"), 200, "update no-op")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Title: s("Belajar Go"), Content: s("baru")}, "u1"), 200, "update same title + content")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Title: s("Judul Baru"), IsPublished: b(true)}, "u1"), 200, "update new title + publish")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{IsPublished: b(true)}, "u1"), 200, "update already published")
 	// rename into colliding slug (belajar-go-2 owned by other post -> loop)
-	collide := PostRequest{Title: "Belajar Go 2", Category: "Umum", Content: "c", IsPublished: false}
-	expect(t, e.do(http.MethodPut, "/api/posts/"+id, collide, "u1"), 200, "update collide + unpublish")
+	collide := UpdatePostRequest{Title: s("Belajar Go 2"), Category: s("Umum"), Excerpt: s("e"), CoverImagePath: s("/c.png"), IsPublished: b(false)}
+	w = e.do(http.MethodPatch, "/api/posts/"+id, collide, "u1")
+	expect(t, w, 200, "patch collide + unpublish")
+	var upd postEnvelope
+	_ = json.Unmarshal(w.Body.Bytes(), &upd)
+	if upd.Data.Slug != "belajar-go-2-2" || upd.Data.PublishedAt != nil || upd.Data.Category != "Umum" {
+		t.Fatalf("unexpected updated post: %+v", upd.Data)
+	}
 
 	// toggle
 	expect(t, e.do(http.MethodPatch, "/api/posts/abc/toggle-publish", nil, "u1"), 400, "toggle bad id")
 	expect(t, e.do(http.MethodPatch, "/api/posts/9999/toggle-publish", nil, "u1"), 404, "toggle not found")
+	expect(t, e.do(http.MethodPatch, "/api/posts/"+id+"/toggle-publish", nil, "u2"), 403, "toggle other's")
 	expect(t, e.do(http.MethodPatch, "/api/posts/"+id+"/toggle-publish", nil, "u1"), 200, "toggle on")
 	expect(t, e.do(http.MethodPatch, "/api/posts/"+id+"/toggle-publish", nil, "u1"), 200, "toggle off")
 
@@ -235,7 +256,7 @@ func TestPostLifecycle(t *testing.T) {
 		Data StatsResponse `json:"data"`
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &st)
-	if st.Data.TotalPosts != 3 || st.Data.TotalPublished != 1 || st.Data.TotalDraft != 2 {
+	if st.Data.TotalArticles != 3 || st.Data.TotalSelesai != 1 || st.Data.BelumSelesai != 2 {
 		t.Fatalf("unexpected stats: %+v", st.Data)
 	}
 
@@ -246,8 +267,15 @@ func TestPostLifecycle(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "post-terbit") {
 		t.Fatalf("filter result missing post: %s", w.Body.String())
 	}
-	expect(t, e.do(http.MethodGet, "/api/public/posts/post-terbit", nil, ""), 200, "public detail")
-	expect(t, e.do(http.MethodGet, "/api/public/posts/belajar-go-2", nil, ""), 404, "public draft detail")
+	if strings.Contains(w.Body.String(), "user_id") || !strings.Contains(w.Body.String(), `"author"`) {
+		t.Fatalf("public list must hide user_id and include author: %s", w.Body.String())
+	}
+	w = e.do(http.MethodGet, "/api/public/posts/post-terbit", nil, "")
+	expect(t, w, 200, "public detail")
+	if strings.Contains(w.Body.String(), "user_id") {
+		t.Fatalf("public detail must hide user_id: %s", w.Body.String())
+	}
+	expect(t, e.do(http.MethodGet, "/api/public/posts/"+upd.Data.Slug, nil, ""), 404, "public draft detail")
 
 	// admin
 	expect(t, e.do(http.MethodGet, "/api/admin/users", nil, "u1"), 403, "member forbidden")
@@ -256,11 +284,16 @@ func TestPostLifecycle(t *testing.T) {
 	uid := strconv.Itoa(int(e.users["u1"]))
 	expect(t, e.do(http.MethodGet, "/api/admin/users/"+uid+"/posts", nil, "adm"), 200, "admin user posts")
 	expect(t, e.do(http.MethodGet, "/api/admin/users/abc/posts", nil, "adm"), 400, "admin bad id")
-	expect(t, e.do(http.MethodGet, "/api/admin/users/9999/posts", nil, "adm"), 404, "admin user not found")
+	w = e.do(http.MethodGet, "/api/admin/users/9999/posts", nil, "adm")
+	expect(t, w, 200, "admin unknown user")
+	if !strings.Contains(w.Body.String(), `"data":[]`) {
+		t.Fatalf("expected empty data array: %s", w.Body.String())
+	}
 
 	// delete
 	expect(t, e.do(http.MethodDelete, "/api/posts/abc", nil, "u1"), 400, "delete bad id")
 	expect(t, e.do(http.MethodDelete, "/api/posts/9999", nil, "u1"), 404, "delete not found")
+	expect(t, e.do(http.MethodDelete, "/api/posts/"+id, nil, "u2"), 403, "delete other's")
 	expect(t, e.do(http.MethodDelete, "/api/posts/"+id, nil, "u1"), 200, "delete")
 }
 
@@ -283,7 +316,7 @@ func TestPostFaults(t *testing.T) {
 	expect(t, e.do(http.MethodGet, "/api/posts/stats", nil, "u1"), 500, "stats first count")
 	expect(t, e.do(http.MethodGet, "/api/admin/users", nil, "adm"), 500, "admin users list")
 	expect(t, e.do(http.MethodGet, "/api/admin/posts", nil, "adm"), 500, "admin posts")
-	expect(t, e.do(http.MethodGet, "/api/admin/users/"+uid+"/posts", nil, "adm"), 500, "admin user exists")
+	expect(t, e.do(http.MethodGet, "/api/admin/users/"+uid+"/posts", nil, "adm"), 500, "admin user posts")
 
 	// second / third query fails
 	e.f.failQueryAt(2)
@@ -293,11 +326,8 @@ func TestPostFaults(t *testing.T) {
 	e.f.failQueryAt(3)
 	expect(t, e.do(http.MethodGet, "/api/admin/users", nil, "adm"), 500, "admin users second count")
 	e.f.failQueryAt(2)
-	expect(t, e.do(http.MethodGet, "/api/admin/users/"+uid+"/posts", nil, "adm"), 500, "admin list by user")
-	e.f.failQueryAt(2)
-	changed := valid
-	changed.Title = "Judul Lain"
-	expect(t, e.do(http.MethodPut, "/api/posts/"+id, changed, "u1"), 500, "update slug check")
+	newTitle := "Judul Lain"
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{Title: &newTitle}, "u1"), 500, "update slug check")
 
 	// write failures
 	e.f.reset()
@@ -305,7 +335,7 @@ func TestPostFaults(t *testing.T) {
 	expect(t, e.do(http.MethodPost, "/api/posts", valid, "u1"), 500, "create fail")
 	e.f.reset()
 	e.f.failUpdate = true
-	expect(t, e.do(http.MethodPut, "/api/posts/"+id, valid, "u1"), 500, "update fail")
+	expect(t, e.do(http.MethodPut, "/api/posts/"+id, UpdatePostRequest{}, "u1"), 500, "update fail")
 	expect(t, e.do(http.MethodPatch, "/api/posts/"+id+"/toggle-publish", nil, "u1"), 500, "toggle fail")
 	e.f.reset()
 	e.f.failDelete = true

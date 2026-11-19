@@ -84,11 +84,36 @@ func TestAuth_FullLifecycle(t *testing.T) {
 	if wReg.Code != http.StatusCreated {
 		t.Fatalf("expected 201 on register, got %d: %s", wReg.Code, wReg.Body.String())
 	}
+	var regResp struct {
+		Data struct {
+			Token string         `json:"token"`
+			User  map[string]any `json:"user"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(wReg.Body.Bytes(), &regResp)
+	if regResp.Data.Token == "" || regResp.Data.User["username"] != "penulis1" {
+		t.Fatalf("register must return token and user: %s", wReg.Body.String())
+	}
+	if _, hasPass := regResp.Data.User["password"]; hasPass {
+		t.Fatalf("user must not expose password")
+	}
 
-	// 3. Register duplicate -> 409 Conflict
+	// 2b. Register validation: username kosong, email kosong/invalid, password pendek
+	for name, p := range map[string]RegisterRequest{
+		"empty username": {Email: "a@delcom.org", Password: "password123"},
+		"empty email":    {Username: "abc", Password: "password123"},
+		"invalid email":  {Username: "abc", Email: "bukan-email", Password: "password123"},
+		"short password": {Username: "abc", Email: "a@delcom.org", Password: "12345"},
+	} {
+		if w := doJSONRequest(r, http.MethodPost, "/api/auth/register", p, ""); w.Code != http.StatusBadRequest {
+			t.Fatalf("%s: expected 400, got %d", name, w.Code)
+		}
+	}
+
+	// 3. Register duplicate -> 400
 	wDup := doJSONRequest(r, http.MethodPost, "/api/auth/register", regPayload, "")
-	if wDup.Code != http.StatusConflict {
-		t.Fatalf("expected 409 on duplicate register, got %d", wDup.Code)
+	if wDup.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 on duplicate register, got %d", wDup.Code)
 	}
 
 	// 4. Register with >72 byte password -> 500 Internal Server Error
@@ -165,10 +190,29 @@ func TestAuth_FullLifecycle(t *testing.T) {
 		t.Fatalf("expected 200 on update profile, got %d: %s", wUpd.Code, wUpd.Body.String())
 	}
 
+	// 11b. Partial update: hanya email, lalu email + password
+	wPartial := doJSONRequest(r, http.MethodPut, "/api/auth/profile", map[string]string{"email": "only_email@delcom.org"}, token)
+	if wPartial.Code != http.StatusOK || !strings.Contains(wPartial.Body.String(), "only_email@delcom.org") ||
+		!strings.Contains(wPartial.Body.String(), "penulis1_updated") {
+		t.Fatalf("partial email update failed: %d %s", wPartial.Code, wPartial.Body.String())
+	}
+	wPartial = doJSONRequest(r, http.MethodPut, "/api/auth/profile", map[string]string{"email": "e2@delcom.org", "password": "another123"}, token)
+	if wPartial.Code != http.StatusOK {
+		t.Fatalf("email+password update failed: %d %s", wPartial.Code, wPartial.Body.String())
+	}
+	wRelogin := doJSONRequest(r, http.MethodPost, "/api/auth/login", LoginRequest{Username: "penulis1_updated", Password: "another123"}, "")
+	if wRelogin.Code != http.StatusOK {
+		t.Fatalf("login with new password failed: %d", wRelogin.Code)
+	}
+	wShortPass := doJSONRequest(r, http.MethodPut, "/api/auth/profile", map[string]string{"password": "123"}, token)
+	if wShortPass.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 on short password update, got %d", wShortPass.Code)
+	}
+
 	// 12. Update Profile with >72 byte password -> 500
 	wUpdLong := doJSONRequest(r, http.MethodPut, "/api/auth/profile", UpdateProfileRequest{
 		Username: "penulis1_updated",
-		Email:    "penulis1_new@delcom.org",
+		Email:    "e2@delcom.org",
 		Password: strings.Repeat("x", 73),
 	}, token)
 	if wUpdLong.Code != http.StatusInternalServerError {
